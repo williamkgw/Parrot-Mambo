@@ -1,0 +1,9 @@
+# Ignorando Dirs
+
+**/__pycache__
+_test/**
+env
+
+# Ignorando Arquivos de Controle
+
+control_loop

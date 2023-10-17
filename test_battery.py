@@ -3,20 +3,28 @@ Demo the trick flying for the python interface
 
 Author: Amy McGovern
 """
+
 from pyparrot.Minidrone import Mambo
+import db.mongo_interface_mambo as mongo_db
+import config.data_interface_json as config
+    
+def callback_database_sensors(args_sensors):
+    if len(args_sensors) != 1:
+        raise Exception('Argument Error: args_sensors')
 
-def read_file_control():
-    with open('control_loop') as file:
-        return file.read()
-
-def get_status_mambo(mambo):
-    sensors = mambo.sensors
-    return sensors.battery, sensors.speed_x, sensors.speed_y, sensors.speed_z
+    print('trouxa')
+    mambo_sensors = args_sensors[0]
+    data_sensors = mongo_db.mambo_get_data_to_insert_in_collection_sensors(mambo_sensors)
+    # print(data_sensors)
+    mongo_db.mambo_insert_in_sensors_collection(data_sensors)
 
 def main():
+    id_drone = config.running_config()['id_drone']
+    drone_data = config.search_drone(id_drone)
 
-    mamboAddr = "e0:14:ba:60:3d:c6"
+    mamboAddr = drone_data['addr']
     mambo = Mambo(mamboAddr, use_wifi = False)
+    sensors_collection = mongo_db.mambo_sensors_collection()
 
     print("trying to connect")
     success = mambo.connect(num_retries=3)
@@ -30,13 +38,18 @@ def main():
     mambo.smart_sleep(2)
     mambo.safe_takeoff(5)
 
-    while read_file_control() != 'parar' and mambo.sensors.battery > 10:
-
+    try:
+        mambo.sensors.set_user_callback_function(callback_database_sensors, (mambo.sensors,))
         mambo.hover()
-        mambo.smart_sleep(0.5)
-        print(get_status_mambo(mambo))    
+        while True:
+            mambo.takeoff()
+            mambo.hover()
+            print('Enviando dados para o mongoDB')
 
-    mambo.safe_land(5)
+    except BaseException as e:
+        print(e)
+
+    mambo.safe_land()
     mambo.smart_sleep(5)
     mambo.disconnect()
 
